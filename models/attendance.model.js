@@ -8,7 +8,11 @@ const AttendanceSchema = new mongoose.Schema({
   date: { type: Date, default: Date.now },  // Date when the attendance is marked
   studentRecords: [{
     studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    status: String,    // 'Present' or 'Absent'
+    status: { // 'Present' or 'Absent'
+      type: String,
+      enum: ['Present' , 'Absent'],
+      required: true
+    }   
   }],
 });
 

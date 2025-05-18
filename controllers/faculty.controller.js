@@ -31,56 +31,114 @@ const loadStudents = async (req, res) => {
 
 
 // API to save attendance data
-const saveAttendance = async (req, res) => {1
-    const { facultyId, department, semester, subject, studentRecords, date } = req.body;
+const saveAttendance = async (req, res) => {
   
-    // Use current date if date is not provided
-    const attendanceDate = date || new Date();
-  
-    try {
-      // Create a new attendance record
-      const newAttendance = new Attendance({
-        facultyId,
-        department,
-        semester,
-        subject,
-        date: attendanceDate,
-        studentRecords,
-      });
-  
-      // Save attendance record to database
-      await newAttendance.save();
-  
-      res.status(200).json({ message: "Attendance saved successfully!" });
-    } catch (error) {
-      console.error("Error saving attendance:", error);
-      res.status(500).json({ message: "Failed to save attendance" });
+  const { facultyId, department, semester, subject, studentRecords, date } = req.body;
+
+  // Use current date if date is not provided
+  const attendanceDate = date || new Date();
+
+  try {
+    // Create a new attendance record
+    const newAttendance = new Attendance({
+      facultyId,
+      department,
+      semester,
+      subject,
+      date: attendanceDate,
+      studentRecords,
+    });
+
+    // Save attendance record to database
+    await newAttendance.save();
+
+    res.status(200).json({ message: "Attendance saved successfully!" });
+  } catch (error) {
+    console.error("Error saving attendance:", error);
+    res.status(500).json({ message: "Failed to save attendance" });
+  }
+};
+
+
+const getAbsenteeSummary = async (req, res) => {
+  const { facultyId } = req.query;
+
+  const today = new Date();
+   today.setUTCHours(0, 0, 0, 0);
+
+  const yesterday = new Date(today);
+  yesterday.setUTCDate(today.getUTCDate() - 1);
+
+  try {
+    const records = await Attendance.find({
+      facultyId,
+      date: { $gte: yesterday }
+    });
+
+    const summary = {};
+
+    for (const record of records) {
+      const recordDate = new Date(record.date);
+      recordDate.setUTCHours(0, 0, 0, 0); 
+      
+      
+      const key = `${record.department}-${record.semester}-${record.subject}`;
+      const absentCount = record.studentRecords.filter(
+        s => s.status === "Absent"
+      ).length;
+
+      if (!summary[key]) {
+        summary[key] = {
+          department: record.department,
+          semester: record.semester,
+          subject: record.subject,
+          todayAbsent: 0,
+          yesterdayAbsent: 0
+        };
+      }
+
+
+      if (recordDate.getTime() === today.getTime()) {
+        summary[key].todayAbsent += absentCount;
+      } else if (recordDate.getTime() === yesterday.getTime()) {
+        summary[key].yesterdayAbsent += absentCount;
+      }
+
     }
-  };
+
+    res.json(Object.values(summary)); // send as array of sections
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ message: "Something went wrong" });
+  }
+};
+
 
 
 const getAttendanceHistory = async (req, res) => {
-    try {
-      const { facultyId, department, semester, subject } = req.query;
-  
-      const attendance = await Attendance.find({
-        facultyId,
-        department,
-        semester,
-        subject
-      }).sort({ date: -1 });  // Sort by date, most recent first
-  
-      res.status(200).json(attendance);
-    } catch (error) {
-      console.error("Error fetching attendance history:", error);
-      res.status(500).json({ message: "Internal Server Error" });
-    }
-  };
-  
-  
-export { saveAttendance,
-         loadStudents,
-         getAttendanceHistory
-       };  // Export function for use in routes
+  try {
+    const { facultyId, department, semester, subject } = req.query;
 
-  
+    const attendance = await Attendance.find({
+      facultyId,
+      department,
+      semester,
+      subject
+    }).sort({ date: -1 });  // Sort by date, most recent first
+
+    res.status(200).json(attendance);
+  } catch (error) {
+    console.error("Error fetching attendance history:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+
+export {
+  saveAttendance,
+  loadStudents,
+  getAbsenteeSummary,
+  getAttendanceHistory
+};  // Export function for use in routes
+
+
